@@ -1,0 +1,29 @@
+# Crontab entries for Speech-to-Text application
+# Add these entries to your crontab: sudo crontab -e
+
+# Daily backup at 2 AM
+0 2 * * * /var/www/speechtotext/backup.sh >> /var/log/speechtotext_backup.log 2>&1
+
+# Security monitoring every 30 minutes
+*/30 * * * * /var/www/speechtotext/security_monitor.sh
+
+# Clean old media files (older than 30 days) - weekly on Sunday at 3 AM
+0 3 * * 0 find /var/www/speechtotext/media -name "*.wav" -o -name "*.mp3" -o -name "*.m4a" -mtime +30 -delete
+
+# Update system packages - monthly on the 1st at 4 AM
+0 4 1 * * apt update && apt upgrade -y >> /var/log/system_update.log 2>&1
+
+# Restart application service - weekly on Monday at 5 AM
+0 5 * * 1 systemctl restart speechtotext
+
+# SSL certificate renewal check - monthly on the 15th at 6 AM
+0 6 15 * * certbot renew --quiet
+
+# Clean Django sessions - daily at 1 AM
+0 1 * * * cd /var/www/speechtotext && /var/www/speechtotext/venv/bin/python manage.py clearsessions
+
+# Collect and compress static files - weekly on Sunday at 1:30 AM
+30 1 * * 0 cd /var/www/speechtotext && /var/www/speechtotext/venv/bin/python manage.py collectstatic --noinput
+
+# Database maintenance - weekly on Sunday at 4 AM
+0 4 * * 0 sudo -u postgres vacuumdb -a -z

@@ -1,0 +1,288 @@
+{% extends 'speech_app/base.html' %}
+
+{% block title %}Tüm Transkriptler - Speech to Text{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>
+                <i class="fas fa-list me-2 text-primary"></i>
+                Tüm Transkriptler
+            </h2>
+            <a href="{% url 'upload_audio' %}" class="btn btn-primary">
+                <i class="fas fa-plus me-2"></i>
+                Yeni Transkripsiyon
+            </a>
+        </div>
+    </div>
+</div>
+
+{% if transcriptions %}
+    <div class="row">
+        <div class="col-12">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th scope="col">
+                                <i class="fas fa-file-audio me-1"></i>
+                                Başlık
+                            </th>
+                            <th scope="col">
+                                <i class="fas fa-language me-1"></i>
+                                Dil
+                            </th>
+                            <th scope="col">
+                                <i class="fas fa-weight me-1"></i>
+                                Boyut
+                            </th>
+                            <th scope="col">
+                                <i class="fas fa-calendar me-1"></i>
+                                Tarih
+                            </th>
+                            <th scope="col">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Durum
+                            </th>
+                            <th scope="col">
+                                <i class="fas fa-cog me-1"></i>
+                                İşlemler
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for transcription in transcriptions %}
+                        <tr>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <i class="fas fa-file-audio text-primary me-2"></i>
+                                    <div>
+                                        <strong>{{ transcription.title|truncatechars:40 }}</strong>
+                                        {% if transcription.transcription and transcription.status == 'completed' %}
+                                            <br>
+                                            <small class="text-muted">
+                                                {{ transcription.transcription|truncatechars:60 }}
+                                            </small>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="badge bg-info">
+                                    {% if transcription.language == 'tr-TR' %}
+                                        <i class="fas fa-flag me-1"></i>TR
+                                    {% elif transcription.language == 'en-US' %}
+                                        <i class="fas fa-flag me-1"></i>EN-US
+                                    {% elif transcription.language == 'en-GB' %}
+                                        <i class="fas fa-flag me-1"></i>EN-GB
+                                    {% else %}
+                                        {{ transcription.language }}
+                                    {% endif %}
+                                </span>
+                            </td>
+                            <td>
+                                {% if transcription.get_file_size_mb %}
+                                    <span class="text-muted">
+                                        <i class="fas fa-hdd me-1"></i>
+                                        {{ transcription.get_file_size_mb }} MB
+                                    </span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="text-muted">
+                                    <i class="fas fa-clock me-1"></i>
+                                    {{ transcription.created_at|date:"d M Y" }}
+                                    <br>
+                                    <small>{{ transcription.created_at|date:"H:i" }}</small>
+                                </span>
+                            </td>
+                            <td>
+                                {% if transcription.status == 'completed' %}
+                                    <span class="badge bg-success">
+                                        <i class="fas fa-check me-1"></i>
+                                        Tamamlandı
+                                    </span>
+                                {% elif transcription.status == 'processing' %}
+                                    <span class="badge bg-warning">
+                                        <i class="fas fa-spinner fa-spin me-1"></i>
+                                        İşleniyor
+                                    </span>
+                                {% elif transcription.status == 'error' %}
+                                    <span class="badge bg-danger">
+                                        <i class="fas fa-exclamation-triangle me-1"></i>
+                                        Hata
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-secondary">
+                                        <i class="fas fa-clock me-1"></i>
+                                        Bekliyor
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group" role="group">
+                                    <a href="{% url 'transcription_detail' transcription.pk %}" 
+                                       class="btn btn-outline-primary btn-sm" title="Detay Görüntüle">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    {% if transcription.audio_file %}
+                                    <a href="{{ transcription.audio_file.url }}" 
+                                       class="btn btn-outline-secondary btn-sm" 
+                                       title="Ses Dosyasını İndir" download>
+                                        <i class="fas fa-download"></i>
+                                    </a>
+                                    {% endif %}
+                                    {% if transcription.transcription and transcription.status == 'completed' %}
+                                    <button class="btn btn-outline-success btn-sm" 
+                                            title="Metni Kopyala"
+                                            onclick="copyTranscription('{{ transcription.transcription|escapejs }}')">
+                                        <i class="fas fa-copy"></i>
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Pagination can be added here in the future -->
+    <div class="row mt-4">
+        <div class="col-12 text-center">
+            <p class="text-muted">
+                <i class="fas fa-info-circle me-1"></i>
+                Toplam {{ transcriptions.count }} transkripsiyon bulundu
+            </p>
+        </div>
+    </div>
+    
+{% else %}
+    <div class="row">
+        <div class="col-12">
+            <div class="text-center py-5">
+                <i class="fas fa-file-audio fa-5x text-muted mb-4"></i>
+                <h3 class="text-muted">Henüz transkripsiyon bulunmuyor</h3>
+                <p class="lead text-muted">İlk ses dosyanızı yükleyerek başlayın!</p>
+                <a href="{% url 'upload_audio' %}" class="btn btn-primary btn-lg">
+                    <i class="fas fa-upload me-2"></i>
+                    Ses Dosyası Yükle
+                </a>
+            </div>
+        </div>
+    </div>
+{% endif %}
+
+<!-- Quick Actions Card -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card bg-light">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="fas fa-rocket me-2 text-primary"></i>
+                    Hızlı İşlemler
+                </h5>
+                <div class="row">
+                    <div class="col-md-3">
+                        <a href="{% url 'upload_audio' %}" class="btn btn-outline-primary w-100 mb-2">
+                            <i class="fas fa-plus me-2"></i>
+                            Yeni Yükle
+                        </a>
+                    </div>
+                    <div class="col-md-3">
+                        <button class="btn btn-outline-secondary w-100 mb-2" onclick="location.reload()">
+                            <i class="fas fa-sync-alt me-2"></i>
+                            Yenile
+                        </button>
+                    </div>
+                    <div class="col-md-3">
+                        <button class="btn btn-outline-info w-100 mb-2" onclick="filterByStatus('completed')">
+                            <i class="fas fa-filter me-2"></i>
+                            Tamamlanan
+                        </button>
+                    </div>
+                    <div class="col-md-3">
+                        <a href="{% url 'home' %}" class="btn btn-outline-dark w-100 mb-2">
+                            <i class="fas fa-home me-2"></i>
+                            Ana Sayfa
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function copyTranscription(text) {
+    // Create temporary textarea
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    document.body.appendChild(textarea);
+    textarea.select();
+    
+    try {
+        document.execCommand('copy');
+        showToast('Transkripsiyon metni kopyalandı!', 'success');
+    } catch (err) {
+        showToast('Kopyalama hatası!', 'error');
+    }
+    
+    document.body.removeChild(textarea);
+}
+
+function filterByStatus(status) {
+    // Simple client-side filtering (can be enhanced with server-side filtering)
+    const rows = document.querySelectorAll('tbody tr');
+    
+    rows.forEach(row => {
+        const statusBadge = row.querySelector('td:nth-child(5) .badge');
+        if (status === 'completed' && statusBadge.classList.contains('bg-success')) {
+            row.style.display = '';
+        } else if (status !== 'completed') {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+    
+    showToast(`${status === 'completed' ? 'Tamamlanan' : 'Tüm'} transkriptler gösteriliyor`, 'info');
+}
+
+function showToast(message, type) {
+    // Simple toast notification
+    const toast = document.createElement('div');
+    toast.className = `alert alert-${type === 'success' ? 'success' : type === 'error' ? 'danger' : 'info'} position-fixed`;
+    toast.style.top = '20px';
+    toast.style.right = '20px';
+    toast.style.zIndex = '9999';
+    toast.textContent = message;
+    
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        if (document.body.contains(toast)) {
+            document.body.removeChild(toast);
+        }
+    }, 3000);
+}
+
+// Auto refresh for processing items
+document.addEventListener('DOMContentLoaded', function() {
+    const processingRows = document.querySelectorAll('.badge.bg-warning');
+    if (processingRows.length > 0) {
+        // Refresh page every 30 seconds if there are processing items
+        setTimeout(() => {
+            location.reload();
+        }, 30000);
+    }
+});
+</script>
+{% endblock %}

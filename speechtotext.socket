@@ -1,0 +1,10 @@
+[Unit]
+Description=speechtotext gunicorn socket
+
+[Socket]
+ListenStream=/run/gunicorn/speechtotext.sock
+SocketUser=www-data
+SocketMode=600
+
+[Install]
+WantedBy=sockets.target

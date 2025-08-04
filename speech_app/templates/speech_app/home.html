@@ -1,0 +1,144 @@
+{% extends 'speech_app/base.html' %}
+{% load math_extras %}
+
+{% block title %}Ana Sayfa - Speech to Text{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="jumbotron bg-light p-5 rounded-3 mb-4">
+            <div class="container-fluid py-5">
+                <h1 class="display-5 fw-bold text-primary">
+                    <i class="fas fa-microphone me-3"></i>
+                    Speech to Text Uygulaması
+                </h1>
+                <p class="col-md-8 fs-4">
+                    Ses dosyalarınızı yükleyin ve otomatik olarak metne dönüştürün. 
+                    Türkçe ve İngilizce dil desteği ile hızlı ve doğru transkripsiyon.
+                </p>
+                <a class="btn btn-primary btn-lg" href="{% url 'upload_audio' %}" role="button">
+                    <i class="fas fa-upload me-2"></i>
+                    Hemen Başla
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <h2 class="mb-4">
+            <i class="fas fa-clock me-2"></i>
+            Son Transkriptler
+        </h2>
+        
+        {% if recent_transcriptions %}
+            <div class="row">
+                {% for transcription in recent_transcriptions %}
+                    <div class="col-md-6 mb-3">
+                        <div class="card transcription-card h-100">
+                            <div class="card-body">
+                                <h5 class="card-title">
+                                    <i class="fas fa-file-audio me-2 text-primary"></i>
+                                    {{ transcription.title|truncatechars:30 }}
+                                </h5>
+                                <p class="card-text text-muted small">
+                                    <i class="fas fa-calendar me-1"></i>
+                                    {{ transcription.created_at|date:"d M Y H:i" }}
+                                    {% if transcription.get_duration_formatted %}
+                                        • <i class="fas fa-clock me-1"></i>{{ transcription.get_duration_formatted }}
+                                    {% endif %}
+                                </p>
+                                
+                                {% if transcription.quality_score %}
+                                <div class="mb-2">
+                                    <span class="badge bg-{{ transcription.get_quality_color }} me-2">
+                                        <i class="fas fa-star me-1"></i>
+                                        {{ transcription.get_quality_level }}
+                                    </span>
+                                    {% if transcription.success_rate %}
+                                    <small class="text-muted">%{{ transcription.success_rate|floatformat:0 }} başarı</small>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                                
+                                <p class="card-text">
+                                    {{ transcription.transcription|truncatechars:100 }}
+                                </p>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="badge bg-success status-badge">
+                                        <i class="fas fa-check me-1"></i>
+                                        {{ transcription.get_status_display }}
+                                    </span>
+                                    <a href="{% url 'transcription_detail' transcription.pk %}" class="btn btn-outline-primary btn-sm">
+                                        <i class="fas fa-eye me-1"></i>
+                                        Detay
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+            
+            <div class="text-center mt-4">
+                <a href="{% url 'transcription_list' %}" class="btn btn-outline-primary">
+                    <i class="fas fa-list me-2"></i>
+                    Tümünü Gör
+                </a>
+            </div>
+        {% else %}
+            <div class="alert alert-info text-center">
+                <i class="fas fa-info-circle me-2"></i>
+                Henüz transkript bulunmuyor. 
+                <a href="{% url 'upload_audio' %}" class="alert-link">İlk ses dosyanızı yükleyin!</a>
+            </div>
+        {% endif %}
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card bg-light">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="fas fa-info-circle me-2 text-info"></i>
+                    Nasıl Kullanılır?
+                </h5>
+                <ol class="list-unstyled">
+                    <li class="mb-2">
+                        <i class="fas fa-upload text-primary me-2"></i>
+                        <strong>1. Yükle:</strong> Ses dosyanızı seçin
+                    </li>
+                    <li class="mb-2">
+                        <i class="fas fa-language text-success me-2"></i>
+                        <strong>2. Dil Seç:</strong> Türkçe veya İngilizce
+                    </li>
+                    <li class="mb-2">
+                        <i class="fas fa-cog text-warning me-2"></i>
+                        <strong>3. İşle:</strong> Otomatik transkripsiyon
+                    </li>
+                    <li class="mb-2">
+                        <i class="fas fa-download text-info me-2"></i>
+                        <strong>4. İndir:</strong> Metni kopyala veya indir
+                    </li>
+                </ol>
+            </div>
+        </div>
+        
+        <div class="card mt-4">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="fas fa-file-audio me-2 text-success"></i>
+                    Desteklenen Formatlar
+                </h5>
+                <ul class="list-unstyled">
+                    <li><i class="fas fa-check text-success me-2"></i>WAV</li>
+                    <li><i class="fas fa-check text-success me-2"></i>MP3</li>
+                    <li><i class="fas fa-check text-success me-2"></i>M4A</li>
+                    <li><i class="fas fa-check text-success me-2"></i>FLAC</li>
+                    <li><i class="fas fa-check text-success me-2"></i>OGG</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

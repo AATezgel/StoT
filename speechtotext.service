@@ -1,0 +1,24 @@
+[Unit]
+Description=speechtotext gunicorn daemon
+Requires=speechtotext.socket
+After=network.target
+
+[Service]
+Type=notify
+User=www-data
+Group=www-data
+RuntimeDirectory=gunicorn
+WorkingDirectory=/var/www/speechtotext
+ExecStart=/var/www/speechtotext/venv/bin/gunicorn \
+          --access-logfile - \
+          --workers 3 \
+          --timeout 300 \
+          --bind unix:/run/gunicorn/speechtotext.sock \
+          speechtotext_project.wsgi:application
+ExecReload=/bin/kill -s HUP $MAINPID
+KillMode=mixed
+TimeoutStopSec=5
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,221 @@
+{% extends 'speech_app/base.html' %}
+
+{% block title %}Ses Yükle - Speech to Text{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">
+                    <i class="fas fa-upload me-2"></i>
+                    Ses Dosyası Yükle
+                </h4>
+            </div>
+            <div class="card-body">
+                <form method="post" enctype="multipart/form-data" id="uploadForm">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label for="title" class="form-label">
+                            <i class="fas fa-tag me-1"></i>
+                            Başlık (Opsiyonel)
+                        </label>
+                        <input type="text" class="form-control" id="title" name="title" 
+                               placeholder="Ses dosyası için bir başlık girin">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="language" class="form-label">
+                            <i class="fas fa-language me-1"></i>
+                            Dil
+                        </label>
+                        <select class="form-select" id="language" name="language">
+                            <option value="tr-TR">Türkçe</option>
+                            <option value="en-US">İngilizce (ABD)</option>
+                            <option value="en-GB">İngilizce (İngiltere)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label for="audio_file" class="form-label">
+                            <i class="fas fa-file-audio me-1"></i>
+                            Ses Dosyası
+                        </label>
+                        <div class="upload-area" id="uploadArea">
+                            <i class="fas fa-cloud-upload-alt fa-3x text-primary mb-3"></i>
+                            <h5>Ses dosyanızı buraya sürükleyin</h5>
+                            <p class="text-muted">veya dosya seçmek için tıklayın</p>
+                            <input type="file" class="form-control" id="audio_file" name="audio_file" 
+                                   accept=".wav,.mp3,.m4a,.flac,.ogg" required style="display: none;">
+                            <button type="button" class="btn btn-outline-primary" onclick="document.getElementById('audio_file').click();">
+                                <i class="fas fa-folder-open me-2"></i>
+                                Dosya Seç
+                            </button>
+                        </div>
+                        <div class="form-text">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Desteklenen formatlar: WAV, MP3, M4A, FLAC, OGG (Max: 200MB)
+                            <br>
+                            <small class="text-warning">
+                                <i class="fas fa-clock me-1"></i>
+                                <strong>Not:</strong> Uzun ses dosyaları (>5 dakika) işlenmesi daha uzun sürebilir.
+                            </small>
+                        </div>
+                        <div id="fileInfo" class="mt-2" style="display: none;">
+                            <div class="alert alert-info">
+                                <i class="fas fa-file me-2"></i>
+                                <span id="fileName"></span>
+                                <br>
+                                <small class="text-muted">
+                                    <i class="fas fa-weight me-1"></i>
+                                    Boyut: <span id="fileSize"></span>
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
+                            <i class="fas fa-magic me-2"></i>
+                            Transkripsiyon Başlat
+                        </button>
+                        <a href="{% url 'home' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left me-2"></i>
+                            Ana Sayfaya Dön
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Processing Modal -->
+        <div class="modal fade" id="processingModal" tabindex="-1" data-bs-backdrop="static">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-body text-center p-4">
+                        <div class="spinner-border text-primary mb-3" role="status">
+                            <span class="visually-hidden">Yükleniyor...</span>
+                        </div>
+                        <h5>Ses dosyanız işleniyor...</h5>
+                        <p class="text-muted">Bu işlem birkaç dakika sürebilir. Lütfen bekleyin.</p>
+                        <div class="mt-3">
+                            <small class="text-info">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Uzun dosyalar otomatik olarak parçalara bölünerek işlenir.
+                            </small>
+                        </div>
+                        <div class="progress mt-3" style="height: 6px;">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                 role="progressbar" style="width: 100%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('audio_file');
+    const fileInfo = document.getElementById('fileInfo');
+    const fileName = document.getElementById('fileName');
+    const fileSize = document.getElementById('fileSize');
+    const submitBtn = document.getElementById('submitBtn');
+    const form = document.getElementById('uploadForm');
+    const processingModal = new bootstrap.Modal(document.getElementById('processingModal'));
+
+    // Drag and drop functionality
+    uploadArea.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        uploadArea.classList.add('dragover');
+    });
+
+    uploadArea.addEventListener('dragleave', function(e) {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+    });
+
+    uploadArea.addEventListener('drop', function(e) {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+        
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            fileInput.files = files;
+            displayFileInfo(files[0]);
+        }
+    });
+
+    // File input change
+    fileInput.addEventListener('change', function(e) {
+        if (e.target.files.length > 0) {
+            displayFileInfo(e.target.files[0]);
+        }
+    });
+
+    // Display file information
+    function displayFileInfo(file) {
+        fileName.textContent = file.name;
+        fileSize.textContent = formatFileSize(file.size);
+        fileInfo.style.display = 'block';
+        
+        // Uzun dosya uyarısı
+        const fileSizeMB = file.size / (1024 * 1024);
+        if (fileSizeMB > 50) {
+            const warningDiv = document.createElement('div');
+            warningDiv.className = 'alert alert-warning mt-2';
+            warningDiv.innerHTML = `
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <strong>Büyük dosya tespit edildi!</strong> 
+                Bu dosya (${fileSizeMB.toFixed(1)}MB) işlenmesi 5-10 dakika sürebilir.
+            `;
+            fileInfo.appendChild(warningDiv);
+        }
+    }
+
+    // Format file size
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    // Form submission
+    form.addEventListener('submit', function(e) {
+        const file = fileInput.files[0];
+        if (!file) {
+            e.preventDefault();
+            alert('Lütfen bir ses dosyası seçin.');
+            return;
+        }
+
+        // Check file size (200MB limit)
+        if (file.size > 200 * 1024 * 1024) {
+            e.preventDefault();
+            alert('Dosya boyutu 200MB\'dan büyük olamaz.');
+            return;
+        }
+
+        // Uzun dosya için ekstra uyarı
+        const fileSizeMB = file.size / (1024 * 1024);
+        if (fileSizeMB > 50) {
+            if (!confirm('Bu büyük dosya işlenmesi uzun sürebilir (5-10 dakika). Devam etmek istiyor musunuz?')) {
+                e.preventDefault();
+                return;
+            }
+        }
+
+        // Show processing modal
+        submitBtn.disabled = true;
+        processingModal.show();
+    });
+});
+</script>
+{% endblock %}

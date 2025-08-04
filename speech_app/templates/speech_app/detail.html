@@ -1,0 +1,339 @@
+{% extends 'speech_app/base.html' %}
+{% load math_extras %}
+
+{% block title %}{{ audio_upload.title }} - Transkripsiyon Detayı{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'home' %}">Ana Sayfa</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'transcription_list' %}">Transkriptler</a></li>
+                <li class="breadcrumb-item active">{{ audio_upload.title }}</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">
+                    <i class="fas fa-file-audio me-2 text-primary"></i>
+                    {{ audio_upload.title }}
+                </h4>
+                <span class="badge bg-{% if audio_upload.status == 'completed' %}success{% elif audio_upload.status == 'error' %}danger{% elif audio_upload.status == 'processing' %}warning{% else %}secondary{% endif %}">
+                    {{ audio_upload.get_status_display }}
+                </span>
+            </div>
+            <div class="card-body">
+                {% if audio_upload.status == 'completed' and audio_upload.transcription %}
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">
+                            <i class="fas fa-align-left me-1"></i>
+                            Transkripsiyon Metni
+                        </label>
+                        <div class="position-relative">
+                            <textarea class="form-control" id="transcriptionText" rows="10" readonly>{{ audio_upload.transcription }}</textarea>
+                            <button class="btn btn-outline-secondary btn-sm position-absolute top-0 end-0 m-2" 
+                                    onclick="copyToClipboard('transcriptionText')" title="Metni Kopyala">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <button class="btn btn-primary me-2" onclick="downloadText()">
+                                <i class="fas fa-download me-1"></i>
+                                TXT Olarak İndir
+                            </button>
+                            <button class="btn btn-success" onclick="copyToClipboard('transcriptionText')">
+                                <i class="fas fa-copy me-1"></i>
+                                Metni Kopyala
+                            </button>
+                        </div>
+                        <div class="col-md-6 text-end">
+                            <small class="text-muted">
+                                Kelime sayısı: <span id="wordCount"></span>
+                            </small>
+                        </div>
+                    </div>
+                {% elif audio_upload.status == 'processing' %}
+                    <div class="text-center py-4">
+                        <div class="spinner-border text-primary mb-3" role="status">
+                            <span class="visually-hidden">İşleniyor...</span>
+                        </div>
+                        <h5>Transkripsiyon İşleniyor</h5>
+                        <p class="text-muted">Ses dosyanız işleniyor, lütfen bekleyin...</p>
+                        <button class="btn btn-outline-primary" onclick="location.reload()">
+                            <i class="fas fa-sync-alt me-1"></i>
+                            Durumu Yenile
+                        </button>
+                    </div>
+                {% elif audio_upload.status == 'error' %}
+                    <div class="alert alert-danger text-center">
+                        <i class="fas fa-exclamation-triangle fa-2x mb-2"></i>
+                        <h5>Transkripsiyon Hatası</h5>
+                        <p>Ses dosyası işlenirken bir hata oluştu. Lütfen tekrar deneyin.</p>
+                        <a href="{% url 'upload_audio' %}" class="btn btn-primary">
+                            <i class="fas fa-redo me-1"></i>
+                            Yeniden Dene
+                        </a>
+                    </div>
+                {% else %}
+                    <div class="alert alert-warning text-center">
+                        <i class="fas fa-clock fa-2x mb-2"></i>
+                        <h5>İşlem Bekliyor</h5>
+                        <p>Ses dosyası henüz işlenmedi.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Dosya Bilgileri
+                </h5>
+            </div>
+            <div class="card-body">
+                <dl class="row">
+                    <dt class="col-sm-5">
+                        <i class="fas fa-file me-1"></i>
+                        Dosya Adı:
+                    </dt>
+                    <dd class="col-sm-7">{{ audio_upload.audio_file.name|default:"Bilinmiyor" }}</dd>
+                    
+                    <dt class="col-sm-5">
+                        <i class="fas fa-weight me-1"></i>
+                        Boyut:
+                    </dt>
+                    <dd class="col-sm-7">
+                        {% if audio_upload.get_file_size_mb %}
+                            {{ audio_upload.get_file_size_mb }} MB
+                        {% else %}
+                            Bilinmiyor
+                        {% endif %}
+                    </dd>
+                    
+                    {% if audio_upload.duration %}
+                    <dt class="col-sm-5">
+                        <i class="fas fa-hourglass-half me-1"></i>
+                        Süre:
+                    </dt>
+                    <dd class="col-sm-7">
+                        {{ audio_upload.get_duration_formatted }}
+                        ({{ audio_upload.duration|floatformat:0 }} saniye)
+                    </dd>
+                    {% endif %}
+                    
+                    {% if audio_upload.quality_score %}
+                    <dt class="col-sm-5">
+                        <i class="fas fa-star me-1"></i>
+                        Kalite:
+                    </dt>
+                    <dd class="col-sm-7">
+                        <span class="badge bg-{{ audio_upload.get_quality_color }}">
+                            {{ audio_upload.get_quality_level }}
+                        </span>
+                        <small class="text-muted">({{ audio_upload.quality_score|floatformat:1 }}/100)</small>
+                    </dd>
+                    {% endif %}
+                    
+                    {% if audio_upload.success_rate %}
+                    <dt class="col-sm-5">
+                        <i class="fas fa-chart-line me-1"></i>
+                        Başarı Oranı:
+                    </dt>
+                    <dd class="col-sm-7">
+                        <div class="progress" style="height: 20px;">
+                            <div class="progress-bar bg-{{ audio_upload.get_quality_color }}" 
+                                 role="progressbar" 
+                                 style="width: {{ audio_upload.success_rate }}%">
+                                %{{ audio_upload.success_rate|floatformat:1 }}
+                            </div>
+                        </div>
+                    </dd>
+                    {% endif %}
+                    
+                    <dt class="col-sm-5">
+                        <i class="fas fa-language me-1"></i>
+                        Dil:
+                    </dt>
+                    <dd class="col-sm-7">
+                        {% if audio_upload.language == 'tr-TR' %}
+                            Türkçe
+                        {% elif audio_upload.language == 'en-US' %}
+                            İngilizce (ABD)
+                        {% elif audio_upload.language == 'en-GB' %}
+                            İngilizce (İngiltere)
+                        {% else %}
+                            {{ audio_upload.language }}
+                        {% endif %}
+                    </dd>
+                    
+                    <dt class="col-sm-5">
+                        <i class="fas fa-calendar me-1"></i>
+                        Yüklenme:
+                    </dt>
+                    <dd class="col-sm-7">{{ audio_upload.created_at|date:"d M Y H:i" }}</dd>
+                    
+                    {% if audio_upload.updated_at != audio_upload.created_at %}
+                    <dt class="col-sm-5">
+                        <i class="fas fa-clock me-1"></i>
+                        Güncelleme:
+                    </dt>
+                    <dd class="col-sm-7">{{ audio_upload.updated_at|date:"d M Y H:i" }}</dd>
+                    {% endif %}
+                </dl>
+            </div>
+        </div>
+        
+        {% if audio_upload.total_chunks %}
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-cogs me-2"></i>
+                    İşleme İstatistikleri
+                </h5>
+            </div>
+            <div class="card-body">
+                <dl class="row">
+                    <dt class="col-sm-6">
+                        <i class="fas fa-puzzle-piece me-1"></i>
+                        Toplam Parça:
+                    </dt>
+                    <dd class="col-sm-6">{{ audio_upload.total_chunks }}</dd>
+                    
+                    <dt class="col-sm-6">
+                        <i class="fas fa-check-circle me-1 text-success"></i>
+                        Başarılı:
+                    </dt>
+                    <dd class="col-sm-6">{{ audio_upload.successful_chunks }}</dd>
+                    
+                    <dt class="col-sm-6">
+                        <i class="fas fa-times-circle me-1 text-danger"></i>
+                        Başarısız:
+                    </dt>
+                    <dd class="col-sm-6">{{ audio_upload.total_chunks|sub:audio_upload.successful_chunks }}</dd>
+                    
+                    {% if audio_upload.processing_method %}
+                    <dt class="col-sm-6">
+                        <i class="fas fa-microchip me-1"></i>
+                        Yöntem:
+                    </dt>
+                    <dd class="col-sm-6">
+                        <span class="badge bg-info">{{ audio_upload.processing_method }}</span>
+                    </dd>
+                    {% endif %}
+                </dl>
+            </div>
+        </div>
+        {% endif %}
+        
+        {% if audio_upload.audio_file %}
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-play-circle me-2"></i>
+                    Ses Dosyası
+                </h5>
+            </div>
+            <div class="card-body">
+                <audio controls class="w-100">
+                    <source src="{{ audio_upload.audio_file.url }}" type="audio/mpeg">
+                    Tarayıcınız ses oynatmayı desteklemiyor.
+                </audio>
+                <div class="mt-2">
+                    <a href="{{ audio_upload.audio_file.url }}" class="btn btn-outline-primary btn-sm" download>
+                        <i class="fas fa-download me-1"></i>
+                        Ses Dosyasını İndir
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        <div class="card mt-3">
+            <div class="card-body text-center">
+                <h6 class="card-title">İşlemler</h6>
+                <div class="d-grid gap-2">
+                    <a href="{% url 'upload_audio' %}" class="btn btn-primary">
+                        <i class="fas fa-plus me-1"></i>
+                        Yeni Transkripsiyon
+                    </a>
+                    <a href="{% url 'transcription_list' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-list me-1"></i>
+                        Tüm Transkriptler
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Count words in transcription
+    const transcriptionText = document.getElementById('transcriptionText');
+    if (transcriptionText) {
+        const wordCount = transcriptionText.value.trim().split(/\s+/).length;
+        document.getElementById('wordCount').textContent = wordCount;
+    }
+});
+
+function copyToClipboard(elementId) {
+    const element = document.getElementById(elementId);
+    element.select();
+    element.setSelectionRange(0, 99999); // For mobile devices
+    
+    try {
+        document.execCommand('copy');
+        showToast('Metin başarıyla kopyalandı!', 'success');
+    } catch (err) {
+        showToast('Kopyalama hatası!', 'error');
+    }
+}
+
+function downloadText() {
+    const transcriptionText = document.getElementById('transcriptionText');
+    const text = transcriptionText.value;
+    const filename = '{{ audio_upload.title|escapejs }}_transkripsiyon.txt';
+    
+    const element = document.createElement('a');
+    element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
+    element.setAttribute('download', filename);
+    element.style.display = 'none';
+    
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+    
+    showToast('Dosya indiriliyor...', 'success');
+}
+
+function showToast(message, type) {
+    // Simple toast notification
+    const toast = document.createElement('div');
+    toast.className = `alert alert-${type === 'success' ? 'success' : 'danger'} position-fixed`;
+    toast.style.top = '20px';
+    toast.style.right = '20px';
+    toast.style.zIndex = '9999';
+    toast.textContent = message;
+    
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        document.body.removeChild(toast);
+    }, 3000);
+}
+</script>
+{% endblock %}
