@@ -1,8 +1,12 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
+from django.contrib.auth import login, logout
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.forms import AuthenticationForm
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.core.files.storage import default_storage
+from django.db.models import Q
 import speech_recognition as sr
 import os
 import time
@@ -12,6 +16,7 @@ import noisereduce as nr
 from scipy.io import wavfile
 from pydub import AudioSegment
 from .models import AudioUpload
+from .forms import CustomUserCreationForm, CustomAuthenticationForm
 import tempfile
 import logging
 
@@ -20,13 +25,71 @@ logging.basicConfig(level=logging.INFO)
 
 def home(request):
     """Ana sayfa view'i"""
-    recent_transcriptions = AudioUpload.objects.filter(status='completed')[:5]
+    if request.user.is_authenticated:
+        if request.user.is_staff:
+            # Admin kullanıcı tüm transcriptions'ları görebilir
+            recent_transcriptions = AudioUpload.objects.filter(status='completed')[:5]
+        else:
+            # Normal kullanıcı sadece kendi transcriptions'larını görebilir
+            recent_transcriptions = AudioUpload.objects.filter(
+                user=request.user, 
+                status='completed'
+            )[:5]
+    else:
+        recent_transcriptions = []
+    
     return render(request, 'speech_app/home.html', {
         'recent_transcriptions': recent_transcriptions
     })
 
+def user_login(request):
+    """Kullanıcı giriş view'i"""
+    if request.user.is_authenticated:
+        return redirect('home')
+    
+    if request.method == 'POST':
+        form = CustomAuthenticationForm(request, data=request.POST)
+        if form.is_valid():
+            user = form.get_user()
+            login(request, user)
+            messages.success(request, f'Hoş geldiniz, {user.get_full_name() or user.username}!')
+            next_url = request.GET.get('next', 'home')
+            return redirect(next_url)
+        else:
+            messages.error(request, 'Kullanıcı adı veya şifre hatalı.')
+    else:
+        form = CustomAuthenticationForm()
+    
+    return render(request, 'speech_app/login.html', {'form': form})
+
+def user_register(request):
+    """Kullanıcı kayıt view'i"""
+    if request.user.is_authenticated:
+        return redirect('home')
+    
+    if request.method == 'POST':
+        form = CustomUserCreationForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            login(request, user)
+            messages.success(request, f'Hesabınız başarıyla oluşturuldu! Hoş geldiniz, {user.get_full_name()}!')
+            return redirect('home')
+        else:
+            messages.error(request, 'Kayıt sırasında bir hata oluştu. Lütfen formu kontrol edin.')
+    else:
+        form = CustomUserCreationForm()
+    
+    return render(request, 'speech_app/register.html', {'form': form})
+
+def user_logout(request):
+    """Kullanıcı çıkış view'i"""
+    logout(request)
+    messages.success(request, 'Başarıyla çıkış yaptınız.')
+    return redirect('home')
+
+@login_required
 def upload_audio(request):
-    """Ses dosyası yükleme view'i"""
+    """Ses dosyası yükleme view'i - Sadece giriş yapmış kullanıcılar"""
     if request.method == 'POST':
         try:
             audio_file = request.FILES.get('audio_file')
@@ -53,6 +116,7 @@ def upload_audio(request):
             
             # AudioUpload objesi oluştur
             audio_upload = AudioUpload.objects.create(
+                user=request.user,  # Kullanıcıyı ekle
                 title=title or audio_file.name,
                 audio_file=audio_file,
                 language=language,
@@ -97,16 +161,30 @@ def upload_audio(request):
     
     return render(request, 'speech_app/upload.html')
 
+@login_required
 def transcription_detail(request, pk):
-    """Transkripsiyon detay view'i"""
-    audio_upload = get_object_or_404(AudioUpload, pk=pk)
+    """Kullanıcı bazlı transkripsiyon detay view'i"""
+    if request.user.is_staff:
+        # Admin kullanıcı tüm transcriptions'ları görebilir
+        audio_upload = get_object_or_404(AudioUpload, pk=pk)
+    else:
+        # Normal kullanıcı sadece kendi transcriptions'larını görebilir
+        audio_upload = get_object_or_404(AudioUpload, pk=pk, user=request.user)
+    
     return render(request, 'speech_app/detail.html', {
         'audio_upload': audio_upload
     })
 
+@login_required
 def transcription_list(request):
-    """Tüm transkripsiyonları listele"""
-    transcriptions = AudioUpload.objects.all()
+    """Kullanıcıya göre transkripsiyonları listele"""
+    if request.user.is_staff:
+        # Admin kullanıcı tüm transcriptions'ları görebilir
+        transcriptions = AudioUpload.objects.all()
+    else:
+        # Normal kullanıcı sadece kendi transcriptions'larını görebilir
+        transcriptions = AudioUpload.objects.filter(user=request.user)
+    
     return render(request, 'speech_app/list.html', {
         'transcriptions': transcriptions
     })

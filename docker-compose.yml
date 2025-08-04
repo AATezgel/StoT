@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: speechtotext_db
+      POSTGRES_USER: speechtotext_user
+      POSTGRES_PASSWORD: your_strong_password_here
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  web:
+    build: .
+    environment:
+      - DEBUG=False
+      - SECRET_KEY=your-very-long-random-secret-key-here
+      - DB_NAME=speechtotext_db
+      - DB_USER=speechtotext_user
+      - DB_PASSWORD=your_strong_password_here
+      - DB_HOST=db
+      - DB_PORT=5432
+      - ALLOWED_HOSTS=localhost,127.0.0.1,speechtotext.yourdomain.com
+      - CSRF_TRUSTED_ORIGINS=https://speechtotext.yourdomain.com,http://localhost
+    volumes:
+      - media_volume:/app/media
+      - static_volume:/app/static
+    ports:
+      - "8001:8000"  # Map to unique port for multi-app setup
+    depends_on:
+      - db
+      - redis
+    restart: unless-stopped
+    command: >
+      sh -c "
+        python manage.py migrate &&
+        python manage.py collectstatic --noinput &&
+        gunicorn --bind 0.0.0.0:8000 --workers 3 --timeout 300 speechtotext_project.wsgi:application
+      "
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      - static_volume:/app/static
+      - media_volume:/app/media
+    depends_on:
+      - web
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  media_volume:
+  static_volume:

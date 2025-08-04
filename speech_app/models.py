@@ -1,5 +1,6 @@
 from django.db import models
 from django.utils import timezone
+from django.contrib.auth.models import User
 
 # Create your models here.
 
@@ -7,6 +8,7 @@ class AudioUpload(models.Model):
     """
     Model for storing uploaded audio files and their transcriptions
     """
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='audio_uploads', default=1)
     title = models.CharField(max_length=200, blank=True, null=True)
     audio_file = models.FileField(upload_to='audio_files/')
     transcription = models.TextField(blank=True, null=True)

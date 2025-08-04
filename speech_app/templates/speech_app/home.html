@@ -16,20 +16,34 @@
                     Ses dosyalarınızı yükleyin ve otomatik olarak metne dönüştürün. 
                     Türkçe ve İngilizce dil desteği ile hızlı ve doğru transkripsiyon.
                 </p>
-                <a class="btn btn-primary btn-lg" href="{% url 'upload_audio' %}" role="button">
-                    <i class="fas fa-upload me-2"></i>
-                    Hemen Başla
-                </a>
+                {% if user.is_authenticated %}
+                    <a class="btn btn-primary btn-lg" href="{% url 'upload_audio' %}" role="button">
+                        <i class="fas fa-upload me-2"></i>
+                        Hemen Başla
+                    </a>
+                {% else %}
+                    <div>
+                        <a class="btn btn-primary btn-lg me-2" href="{% url 'login' %}" role="button">
+                            <i class="fas fa-sign-in-alt me-2"></i>
+                            Giriş Yap
+                        </a>
+                        <a class="btn btn-outline-primary btn-lg" href="{% url 'register' %}" role="button">
+                            <i class="fas fa-user-plus me-2"></i>
+                            Kayıt Ol
+                        </a>
+                    </div>
+                {% endif %}
             </div>
         </div>
     </div>
 </div>
 
 <div class="row">
+    {% if user.is_authenticated %}
     <div class="col-md-8">
         <h2 class="mb-4">
             <i class="fas fa-clock me-2"></i>
-            Son Transkriptler
+            {% if user.is_staff %}Son Transkriptler{% else %}Son Transkriptlerim{% endif %}
         </h2>
         
         {% if recent_transcriptions %}
@@ -38,21 +52,24 @@
                     <div class="col-md-6 mb-3">
                         <div class="card transcription-card h-100">
                             <div class="card-body">
-                                <h5 class="card-title">
-                                    <i class="fas fa-file-audio me-2 text-primary"></i>
-                                    {{ transcription.title|truncatechars:30 }}
-                                </h5>
-                                <p class="card-text text-muted small">
-                                    <i class="fas fa-calendar me-1"></i>
-                                    {{ transcription.created_at|date:"d M Y H:i" }}
-                                    {% if transcription.get_duration_formatted %}
-                                        • <i class="fas fa-clock me-1"></i>{{ transcription.get_duration_formatted }}
-                                    {% endif %}
-                                </p>
+                                <h6 class="card-title">
+                                    <i class="fas fa-file-audio me-2"></i>
+                                    {{ transcription.title }}
+                                </h6>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <small class="text-muted">
+                                        <i class="fas fa-calendar me-1"></i>
+                                        {{ transcription.created_at|date:"d M Y H:i" }}
+                                    </small>
+                                    <small class="text-muted">
+                                        <i class="fas fa-user me-1"></i>
+                                        {{ transcription.user.get_full_name|default:transcription.user.username }}
+                                    </small>
+                                </div>
                                 
                                 {% if transcription.quality_score %}
                                 <div class="mb-2">
-                                    <span class="badge bg-{{ transcription.get_quality_color }} me-2">
+                                    <span class="badge bg-{% if transcription.quality_score >= 80 %}success{% elif transcription.quality_score >= 60 %}warning{% else %}danger{% endif %}">
                                         <i class="fas fa-star me-1"></i>
                                         {{ transcription.get_quality_level }}
                                     </span>
@@ -88,16 +105,40 @@
                 </a>
             </div>
         {% else %}
-            <div class="alert alert-info text-center">
-                <i class="fas fa-info-circle me-2"></i>
-                Henüz transkript bulunmuyor. 
-                <a href="{% url 'upload_audio' %}" class="alert-link">İlk ses dosyanızı yükleyin!</a>
+            <div class="card">
+                <div class="card-body text-center">
+                    <i class="fas fa-file-audio text-muted fa-3x mb-3"></i>
+                    <h5>Henüz transkript yok</h5>
+                    <p class="text-muted">İlk ses dosyanızı yükleyin ve transkripsiyon işlemini başlatın.</p>
+                    <a href="{% url 'upload_audio' %}" class="btn btn-primary">
+                        <i class="fas fa-upload me-2"></i>Ses Yükle
+                    </a>
+                </div>
             </div>
         {% endif %}
     </div>
-    
+    {% else %}
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="fas fa-user-lock text-primary fa-3x mb-3"></i>
+                <h3>Hesabınıza Giriş Yapın</h3>
+                <p class="text-muted">Speech-to-Text özelliklerini kullanmak için giriş yapmanız gerekiyor.</p>
+                <div>
+                    <a href="{% url 'login' %}" class="btn btn-primary me-2">
+                        <i class="fas fa-sign-in-alt me-2"></i>Giriş Yap
+                    </a>
+                    <a href="{% url 'register' %}" class="btn btn-outline-primary">
+                        <i class="fas fa-user-plus me-2"></i>Kayıt Ol
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <div class="col-md-4">
-        <div class="card bg-light">
+        <div class="card">
             <div class="card-body">
                 <h5 class="card-title">
                     <i class="fas fa-info-circle me-2 text-info"></i>
@@ -130,12 +171,40 @@
                     <i class="fas fa-file-audio me-2 text-success"></i>
                     Desteklenen Formatlar
                 </h5>
+                <div class="row">
+                    <div class="col-6">
+                        <ul class="list-unstyled">
+                            <li><i class="fas fa-check text-success me-2"></i>MP3</li>
+                            <li><i class="fas fa-check text-success me-2"></i>WAV</li>
+                            <li><i class="fas fa-check text-success me-2"></i>M4A</li>
+                        </ul>
+                    </div>
+                    <div class="col-6">
+                        <ul class="list-unstyled">
+                            <li><i class="fas fa-check text-success me-2"></i>FLAC</li>
+                            <li><i class="fas fa-check text-success me-2"></i>OGG</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Max 200MB</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="fas fa-language me-2 text-warning"></i>
+                    Dil Desteği
+                </h5>
                 <ul class="list-unstyled">
-                    <li><i class="fas fa-check text-success me-2"></i>WAV</li>
-                    <li><i class="fas fa-check text-success me-2"></i>MP3</li>
-                    <li><i class="fas fa-check text-success me-2"></i>M4A</li>
-                    <li><i class="fas fa-check text-success me-2"></i>FLAC</li>
-                    <li><i class="fas fa-check text-success me-2"></i>OGG</li>
+                    <li class="mb-2">
+                        <i class="fas fa-flag me-2"></i>
+                        <strong>Türkçe</strong> - Yüksek doğruluk
+                    </li>
+                    <li class="mb-2">
+                        <i class="fas fa-flag me-2"></i>
+                        <strong>English</strong> - High accuracy
+                    </li>
                 </ul>
             </div>
         </div>
